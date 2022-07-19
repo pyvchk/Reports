@@ -3,3 +3,4 @@
 .ipynb_checkpoints/
 test.py
 __pycache__/
+.mypy_cache/

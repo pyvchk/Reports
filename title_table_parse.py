@@ -49,7 +49,8 @@ def _normalize_parameters(vtd_obj_name: str,
                           vtd_obj_type: str,
                           pipeline_category: str,
                           pipeline_name: Optional[str],
-                          contract_number_and_date: Optional[str]) -> Any:
+                          contract_number_and_date: Optional[str],
+                          pipeline_pressure: Optional[str]) -> Any:
     """Приведение параметров к нормальному виду"""
 
     def _remove_none_value(value: Optional[str]) -> Optional[str]:
@@ -65,6 +66,8 @@ def _normalize_parameters(vtd_obj_name: str,
             types = "Технологические трубопроводы"
         elif re.search(r'[пП]лощад|[цЦ]ех', types):
             types = "Внутриплощадочные технологические трубопроводы"
+        elif re.search(r'[шШ]лейф', types) and re.search(r'[уУ]зел|[уУ]зла', types):
+            types = "Технологические трубопроводы узла подключения и подключающих шлейфов"
         elif re.search(r'[шШ]лейф', types):
             types = "Технологические трубопроводы подключающих шлейфов"
         elif re.search(r'[уУ]зел|[уУ]зла', types):
@@ -122,12 +125,15 @@ def _normalize_parameters(vtd_obj_name: str,
         _remove_none_value(contract_number_and_date))
     pipeline_category_list = pipeline_category.replace(" ", "").split(",")
     vtd_obj_type = _correcting_types(vtd_obj_type)
+    if pipeline_pressure:
+        pipeline_pressure = float(re.sub(r'[М|м|П|П|А|а]', '', pipeline_pressure).replace(',', '.'))
     parse_vtd_obj_parameters = _parse_vtd_obj_name(vtd_obj_name)
     normalize_return = (pipeline_category_list,
                         pipeline_name,
                         vtd_obj_type,
                         contract_number,
                         contract_date,
+                        pipeline_pressure,
                         *parse_vtd_obj_parameters)
 
     return normalize_return
@@ -162,8 +168,13 @@ def title_table_parse(express_name) -> Any:
             contract_number_and_date = title_table.iloc[contract_number_and_date_row + 1, 3]
         else:
             raise NoneParameter("На титульном листе удалены сведения о номере договора/письма")
+        pipeline_pressure_row = _search_cells(r'[Дд]авление', check_column=1)
+        if pipeline_pressure_row:
+            pipeline_pressure = title_table.iloc[pipeline_pressure_row, 2]
+        else:
+            pipeline_pressure = None
         # Перечень заводских номеров оборудования
-        equipment_numbers_list = _search_eq_and_spec(r'Зав', 2)
+        equipment_numbers_list = list(map(int, _search_eq_and_spec(r'Зав', 2)))
         # Перечень специалистов
         specialists_list = _search_eq_and_spec(r'Ф\sИ\sО', 1)
         #
@@ -181,7 +192,8 @@ def title_table_parse(express_name) -> Any:
                                                  vtd_obj_type,
                                                  pipeline_category,
                                                  pipeline_name,
-                                                 contract_number_and_date)
+                                                 contract_number_and_date,
+                                                 pipeline_pressure)
     return_parameters = (client_name,
                          *normalize_parameters,
                          vtd_start_date.date(),
